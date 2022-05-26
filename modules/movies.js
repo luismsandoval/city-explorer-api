@@ -1,16 +1,30 @@
 'use strict';
 
 const axios = require('axios');
+let cache = require('./cache');
 
 async function requestMovies(req) {
-  let search = req.query.search.split(',')[0];
-  const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${search}`;
-  try {
-    const response = await axios.get(url);
-    const movieResults = response.data.results.map(value => new Movie(value));
-    return Promise.resolve(movieResults);
-  } catch (error) {
-    error.customMessage = 'Call the devs';
+  const search = req.query.search.split(',')[0];
+  const key = 'movie-' + search;
+
+  if (cache[key] && (Date.now() - cache[key].timestamp < 43200)) {
+    console.log('Cache hit');
+    return cache[key];
+  } else {
+    console.log('Cache miss');
+    const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&query=${search}`;
+    try {
+      const response = await axios.get(url);
+      const movieResults = response.data.results.map(value => new Movie(value));
+
+      cache[key] = req.query;
+      cache[key].timestamp = Date.now();
+      cache[key].data = movieResults;
+
+      return Promise.resolve(movieResults);
+    } catch (error) {
+      error.customMessage = 'Call the devs';
+    }
   }
 }
 
